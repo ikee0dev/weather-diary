@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weather Diary</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="config.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <h1>Weather Diary</h1>
+    <p class="tagline">A sky that paints and writes about itself, on its own, every six hours.</p>
+  </header>
+
+  <main>
+    <section id="gallery" class="gallery" aria-live="polite">
+      <p class="loading-note">Fetching the diary&hellip;</p>
+    </section>
+  </main>
+
+  <footer>
+    <p>Every entry is real: the numbers come from Open-Meteo, the picture is
+    generated from those numbers by code (no foundation model - see the
+    story behind that), and the caption is written by Gemini. Nothing is
+    invented, nothing is triggered by a visit.</p>
+    <p><a href="https://github.com/dayzer0-dev/weather-diary">Source on GitHub</a></p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
