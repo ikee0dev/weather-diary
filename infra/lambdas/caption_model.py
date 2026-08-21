@@ -1,9 +1,10 @@
 """The caption seam: real weather in, one short first-person line out.
 
-Same proven pattern as the other two apps in this series: Gemini primary
-with a reliable fallback, key from Secrets Manager, structured JSON output,
-no deterministic fallback caption - if every model fails the caller gets an
-honest error rather than a fake line under a real picture.
+Gemini writes it, key pulled from Secrets Manager, structured JSON so the
+Lambda never has to scrape prose out of a chat response. There is no
+canned fallback line: if the model is unreachable the picture still ships,
+just without words under it, rather than a caption that lies about having
+been written by anything.
 """
 
 import json

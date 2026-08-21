@@ -1,10 +1,11 @@
-"""Real weather numbers in, honest visual language out.
+"""Turns one real Open-Meteo reading into the five words the rest of this
+app is allowed to paint and write from - condition, warmth, cloudiness,
+wind, rain. Nothing downstream ever sees the raw numbers directly.
 
-Thresholds calibrated against real Lagos conditions sampled while building
-this (2026-08-21 01:00 WAT: 25.7C, 100% cloud, 5.6 km/h wind, weather_code 3,
-92% humidity, no rain) rather than guessed round numbers, same calibration
-discipline as infra-narrator's descriptor pool. WMO weather_code buckets
-follow the published Open-Meteo table.
+Thresholds were set by sampling the real sky over Lagos before writing a
+single boundary (2026-08-21 01:00 WAT: 25.7C, 100% cloud, 5.6 km/h wind,
+weather_code 3, 92% humidity, no rain) rather than guessing round numbers.
+WMO weather_code buckets follow the published Open-Meteo table.
 """
 
 # WMO weather_code -> a coarse real-world condition bucket.
@@ -52,10 +53,10 @@ def _rain(mm: float) -> str:
             "heavy")
 
 
-def derive(w: dict) -> dict:
-    """w is weather.fetch()'s real dict. Returns the visual/mood vocabulary
-    both the art generator and the caption model read from - never raw
-    numbers reaching either without passing through here first.
+def read(w: dict) -> dict:
+    """w is weather.fetch()'s real dict. Returns the five-word vocabulary
+    both artgen and caption_model read from - never raw numbers reaching
+    either without passing through here first.
     """
     condition = _condition(int(w["weather_code"]))
     warmth = _warmth(w["temperature_c"])
@@ -70,7 +71,7 @@ def derive(w: dict) -> dict:
         "wind": wind,
         "rain": rain,
         "is_day": w["is_day"],
-        "levels": {
+        "labels": {
             "condition": condition, "warmth": warmth, "cloudiness": cloudiness,
             "wind": wind, "rain": rain,
         },

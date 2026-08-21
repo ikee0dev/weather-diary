@@ -9,13 +9,13 @@ Lagos, Nigeria, before writing a single threshold: 2026-08-21 01:00 WAT,
 humidity, no rain. `weather.py` fetches this on every run; nothing about
 the sky downstream is invented.
 
-## Step 2: the descriptor pool
+## Step 2: five words, not raw numbers
 
-`descriptors.py` maps the real numbers into a small honest vocabulary
-(warmth, cloudiness, wind, rain, condition from the WMO weather_code
-table) with thresholds calibrated against the real sample above rather
-than guessed round numbers — same calibration discipline as
-infra-narrator's descriptor pool.
+`conditions.py` reduces the real reading to exactly five words — warmth,
+cloudiness, wind, rain, condition (the last one from the published WMO
+weather_code table) — with thresholds calibrated against the real sample
+above rather than guessed round numbers. Nothing past this file ever sees
+a raw temperature or percentage again.
 
 ## Step 3: the Bedrock detour
 
@@ -50,31 +50,72 @@ title and desc tags carrying the real numbers.
 
 ## Step 5: the caption
 
-`caption_model.py` reuses the proven three-model Gemini pattern from the
-other two apps in this series (key in Secrets Manager, primary +
-fallback, structured JSON, honest error if every model fails — no
-deterministic fallback caption).
+`caption_model.py` asks Gemini for one first-person line, key in Secrets
+Manager, structured JSON response, no canned fallback line — a caption
+failure ships the picture wordless rather than under a fake sentence.
 
-## Step 6: deployed and proven live
+## Step 6: deployed and proven live (first pass, 3 stacks)
 
 CDK-TS, 3 stacks (data: one DynamoDB table, no TTL; api: the diary Lambda
-on a 6-hour EventBridge schedule plus a read-only `GET /gallery`; hosting:
-S3 + CloudFront). `npx tsc --noEmit` and `cdk synth` both clean. Deployed
-to us-east-1 dev.
+on a 6-hour EventBridge schedule plus a read-only `GET /gallery` behind
+API Gateway; hosting: S3 + CloudFront). `npx tsc --noEmit` and `cdk synth`
+both clean. Deployed to us-east-1 dev.
 
 Verified with three real, separately generated entries, not a mock: direct
-invocation of the deployed `wd-diary-dev` Lambda produced real captions
-against the real live conditions -
+invocation of the deployed diary Lambda produced real captions against the
+real live conditions -
   "I am a heavy, silent blanket resting over Lagos tonight. The air is
   still, holding back the dark clouds without a single drop of rain."
   "I am a heavy, unbroken ceiling of gray draped silently over the sleeping
   city. Not a single drop falls from my dark folds, and the night air
   remains completely still."
-- and `GET /gallery` served all three back with their real SVGs intact.
+- and the read route served all three back with their real SVGs intact.
 Confirmed live in a real browser: three cards, each a distinct night sky
 with drifting clouds and a barely-visible moon (honest under 100% real
 cloud cover), real stats line, real UTC timestamp, labelled "unattended."
 EventBridge rule confirmed `ENABLED` on `rate(6 hours)`.
 
-Remaining: hand off to a GitHub repo and publish the Builder Center
-article.
+## Step 7: one stack instead of three, and a name of its own
+
+Once two sibling apps in this series existed side by side, the 3-stack
+data/api/hosting split this one started with read as a copy of theirs
+rather than a decision made for this app's own size. Collapsed to one
+stack (`weather-diary-stack.ts`) — one table, one scheduled writer, one
+public reader, one static site don't need cross-stack exports to talk to
+each other. `descriptors.py` also became `conditions.py` (`derive()`
+became `read()`, the `levels` key became `labels`): a five-word vocabulary
+specific to weather, not a borrowed name from a different app's metaphor
+engine.
+
+The old 3-stack deployment (with its three real proof entries) was
+destroyed cleanly via `aws cloudformation delete-stack`, in dependency
+order (hosting, then api, then data), and the app redeployed as the new
+single stack.
+
+## Step 8: a real dead end - CloudFront OAC does not want to invoke a
+## Lambda Function URL today
+
+Tried to drop API Gateway too: a bare Lambda Function URL for the one read
+route, IAM-authed, reachable only through a CloudFront Origin Access
+Control so there would be no separately-public API domain at all. Every
+piece of the setup matched AWS's own documented shape exactly - resource
+policy scoped to `cloudfront.amazonaws.com` with the right
+`AWS:SourceArn`, OAC config `sigv4` / `always` / `lambda`, origin domain
+matching the real Function URL - and CloudFront still returned a genuine
+`AccessDeniedException` on every request, survived a cache invalidation,
+survived a second full deploy. The Lambda itself was never the problem:
+CloudWatch logs showed clean, successful invocations the entire time,
+which meant the failure was happening in the handshake between two AWS
+features, not in this app's code.
+
+Rather than keep guessing at an AWS-side gap, reverted the one read route
+to a one-resource API Gateway REST API - the same building block already
+proven reliable twice over in the other two entries in this series - and
+kept everything else (the single stack, the direct-to-DynamoDB inline SVG
+storage, the six-hour schedule) as decided in step 7. `npx tsc --noEmit`
+and `cdk synth` clean, deployed, and this time actually confirmed inside a
+real browser tab, not just curl: three fresh entries rendered correctly,
+distinct night skies, real captions, "UNATTENDED" stamped on each one.
+EventBridge rule confirmed `ENABLED` on `rate(6 hours)`.
+
+Remaining: publish the Builder Center article.

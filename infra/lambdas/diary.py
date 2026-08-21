@@ -1,12 +1,12 @@
 """The diary entry: real weather in, one new gallery entry out. Runs on an
 EventBridge schedule - unattended by design, the whole point of the app.
 
-Pipeline: weather.fetch() (real Open-Meteo reading) -> descriptors.derive()
-(honest visual/mood vocabulary) -> artgen.render() (procedural SVG, no
+Pipeline: weather.fetch() (real Open-Meteo reading) -> conditions.read()
+(the five-word vocabulary) -> artgen.render() (procedural SVG, no
 foundation model - see artgen.py's docstring for why) -> caption_model
 .generate_caption() (Gemini, the one AI call in the chain). A caption
 failure does not lose the picture: the entry still gets stored with an
-honest caption_error, same degrade-visibly rule as the other two apps.
+honest caption_error instead.
 """
 
 import json
@@ -17,7 +17,7 @@ import boto3
 
 import artgen
 import caption_model
-import descriptors
+import conditions
 import weather
 
 TABLE_NAME = os.environ["GALLERY_TABLE"]
@@ -27,7 +27,7 @@ _table = boto3.resource("dynamodb").Table(TABLE_NAME)
 
 def handler(event, context):
     w = weather.fetch()
-    d = descriptors.derive(w)
+    d = conditions.read(w)
     svg = artgen.render(w, d)
 
     caption = None
@@ -43,7 +43,7 @@ def handler(event, context):
     record = {
         "generated_at": now.isoformat(timespec="seconds"),
         "weather": w,
-        "descriptors": d["levels"],
+        "conditions": d["labels"],
         "svg": svg,
         "caption": caption,
         "caption_error": caption_error,

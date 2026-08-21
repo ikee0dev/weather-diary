@@ -1,7 +1,7 @@
 """Real weather in: Open-Meteo's current-conditions endpoint, no API key.
 
-Every number the descriptor pool and the art generator use downstream comes
-from here, unmodified. Nothing about the sky is invented.
+Every number conditions.py and artgen.py use downstream comes from here,
+unmodified. Nothing about the sky is invented.
 """
 
 import json

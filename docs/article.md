@@ -2,103 +2,104 @@
 
 Tags: #agents
 
-A sky that paints itself a picture and writes itself a caption, every six
-hours, whether or not anyone is watching.
+Every six hours, whether or not anyone is watching, the sky over Lagos gets
+five words written about it, a picture painted from those five words, and
+a caption written under the picture. Nobody presses anything.
 
 ## Vision & What the App Does
 
-Weather Diary reads the real current weather over Lagos, Nigeria — no API
-key required, Open-Meteo just answers — and turns that single moment into
-one diary entry: a small painted sky and a one-line first-person caption,
-as if the sky itself were keeping a journal. Nobody presses a button.
-Every six hours, an EventBridge schedule wakes a Lambda, it reads whatever
-is really happening outside right now, and by the time anyone visits the
-page there's something new waiting, filed in with everything before it.
-The gallery only ever grows.
+This is a diary that a place keeps about itself. An EventBridge schedule
+wakes a Lambda; the Lambda asks Open-Meteo what's really happening over
+Lagos right now (temperature, wind, cloud cover, rain, day or night); a
+small vocabulary layer boils that down to five words; a picture gets
+painted from those five words; Gemini writes one first-person line about
+the same moment; the whole entry gets filed into a gallery that only ever
+grows. Visit the page and you're not triggering anything — you're reading
+something that already happened without you.
 
-The picture isn't decoration bolted onto a data feed — it's built directly
-from the numbers. Cloud cover controls how many cloud puffs drift across
-the frame and how dense they look. Wind speed and direction decide how
-many wind streaks appear and which way they lean. Precipitation, when
-there is any, draws real rain at an angle that matches the real wind. The
-sun or moon sits at a position derived from the real local hour and
-dims honestly behind heavy cloud rather than just vanishing. Every one of
-those choices is deterministic, given the same real inputs — the picture
-is a direct translation of the weather, not an approximation of it.
+The picture is the part worth dwelling on, because it isn't a generated
+image standing in for the data — it's the data, drawn. 100% cloud cover
+doesn't get described to anything; it directly sets how many cloud shapes
+appear on the canvas and how dense they look. Real wind direction sets the
+angle of the wind streaks. Real precipitation, when there is any, is what
+puts rain on the page at all. A sun or moon sits where the real local hour
+says it should, and dims exactly as much as the real cloud cover dims it.
+Every stroke on that SVG traces back to a number Open-Meteo actually
+reported a few seconds earlier.
 
 ## How You Built It
 
-The plan going in was to let Amazon Bedrock's Nova Canvas paint the sky.
-The code for it was written and ready before I ever pointed it at the
-model. The first real invocation came back `ThrottlingException: Too many
-requests`. A 15-second retry got the same error. To find out whether that
-was a Nova Canvas rate limit or something bigger, I invoked a second,
-completely unrelated Bedrock model — `nova-micro`, five words of prompt —
-and got `ThrottlingException: Too many tokens per day`, the exact same
-message, word for word, that shows up in this account's own build history:
-it's one of the four true showcase stories in a sibling project of mine,
-`debugging-saga`, about a different app hitting this same account-level
-daily allowance months ago. That earlier incident already established the
-only real fix is an AWS Support case, and Basic support can't file one.
-So this wasn't a fluke and it wasn't fixable this weekend.
+Amazon Bedrock's Nova Canvas was supposed to paint the sky. It never got
+the chance: the first real call came back `ThrottlingException: Too many
+requests`, and a second call to a completely different model — `nova-micro`,
+five words of prompt, nothing to do with images — came back
+`ThrottlingException: Too many tokens per day`. That second message is
+word-for-word identical to an incident already logged in a sibling
+project's history (`debugging-saga`'s showcase story about `standup-brief`),
+which means this account has hit the same real daily allowance wall twice
+now, on two different apps, and the fix both times is the same: file an
+AWS Support case, which Basic support can't do. Not fixable this weekend,
+confirmed inside fifteen minutes instead of a wasted afternoon, because the
+first incident was written down honestly instead of quietly worked around.
 
-I didn't fake the picture and I didn't quietly swap in a different
-foundation model and call it a day. Every other app in this series already
-runs on one core technique — a "descriptor pool" that maps real numbers
-into a small honest vocabulary before anything creative happens to them —
-so I applied that same technique one layer further and let *code* paint
-the picture directly from the vocabulary, with no model in that step at
-all. Cloud cover of 100% doesn't ask a model to imagine an overcast sky; it
-directly sets how many cloud shapes get drawn and how opaque they are. A
-`random.Random` seeded on the real observation timestamp adds shape
-variety — three consecutive entries built from nearly identical real
-conditions still look like different moments — without breaking
-reproducibility: the same real minute always paints the same picture.
-Gemini still does real work in the pipeline, writing the caption from the
-same real numbers, because that part of the account has never been
-throttled.
+So the picture is drawn by code, not a model. Every app in this series
+already leans on the same trick — translate real numbers into a small
+honest vocabulary before anything creative happens — and this one just
+pushes that trick one step further: skip the model at the end entirely and
+let the vocabulary drive an SVG generator directly. A `random.Random`
+seeded on the real observation timestamp keeps three near-identical cloudy
+nights from looking like the same picture copy-pasted three times, without
+making the output non-reproducible — the same real minute always paints
+the same way. Gemini is still doing real work; it just moved from painting
+to writing.
 
-I proved the whole chain by invoking the deployed Lambda directly three
-times in a row against real live conditions (25.6C, 100% cloud, calm wind,
-no rain, nighttime) and got three different, specific captions back, never
-generic ones — "a heavy, silent blanket resting over Lagos tonight," "a
-heavy, unbroken ceiling of gray draped silently over the sleeping city" —
-each one served back through the real API with its real picture intact,
-and confirmed live in a browser: three distinct night skies, each with its
-own drifting clouds, a moon dimmed almost to nothing under real 100% cloud
-cover.
+Two more decisions got made after the fact, once a working version existed.
+First: the app started life as a straight copy of this series' other two
+CDK layouts — three stacks, data/api/hosting — and that was never actually
+the right size for one table, one writer, one reader, and one static site.
+Collapsed it to a single stack. Second, and less successful: tried to drop
+API Gateway too, routing the one read endpoint through an IAM-authed
+Lambda Function URL sitting behind CloudFront's Origin Access Control, so
+there would be no separately-public API domain at all. Every setting on
+both sides matched AWS's own documentation exactly — the resource policy,
+the OAC signing config, the origin domain — and CloudFront still returned
+a flat `AccessDeniedException` on every request, survived a cache
+invalidation, survived a full redeploy, while CloudWatch logs showed the
+Lambda itself succeeding every single time. That's a real gap between two
+AWS features, not a bug in this app, and rather than keep guessing at it
+for a weekend, the read route went back to a plain API Gateway REST API —
+the same block already trusted twice over elsewhere in this series.
 
 ## AWS Services Used / Architecture Overview
 
-CDK-TS, three stacks: AWS Lambda (weather fetch, art generation, caption,
-and the read API), Amazon EventBridge (the 6-hour schedule that makes this
-an agent rather than a button someone has to press), Amazon DynamoDB (the
-gallery table — deliberately no TTL, because the growing gallery is the
-whole demo, not a byproduct to clean up), Amazon API Gateway (one
-read-only `GET /gallery`, so a visit never spends model quota), AWS
-Secrets Manager (the Gemini key), and Amazon S3 + Amazon CloudFront for
-the frontend. Open-Meteo supplies the real weather with no key and no
-cost. Google Gemini writes the caption; Amazon Bedrock was the original
-plan for the art and the account-level throttle above is the honest reason
-it isn't in the final pipeline.
+One CDK stack. AWS Lambda runs both the write path (weather, painting,
+captioning) and the read path (the gallery). Amazon EventBridge is the
+actual author of the app — a 6-hour rate rule, deliberately not matched to
+either sibling project's cadence, so the three entries in this series each
+keep their own rhythm. Amazon DynamoDB holds the gallery with no TTL,
+because growth is the point, and each picture lives inline as an SVG
+string attribute rather than as a file in a bucket somewhere. Amazon API
+Gateway fronts the one read route. AWS Secrets Manager holds the Gemini
+key. Amazon S3 + CloudFront serve the static frontend. Open-Meteo supplies
+the weather itself, no key, no cost, no rate limit hit all weekend. See
+`docs/architecture.md` in the repo for the full sequence diagram.
 
 ## What You Learned
 
-The most useful thing that happened this weekend wasn't the feature that
-worked on the first try, it was hitting a wall I recognized. This
-account's Bedrock throttle had already been diagnosed once, in a
-completely different project, months ago, and documented honestly instead
-of hidden — and that documentation is exactly what let me spend fifteen
-minutes confirming the same wall instead of a day debugging it fresh. That
-alone is a good argument for writing these build logs at all. The second
-lesson is about where "AI" actually needs to sit in a creative pipeline:
-it doesn't have to be the part that draws the picture to be the part that
-makes the picture feel alive. A caption and a title, written by a model
-that actually looked at the real numbers, did more to make three nearly
-identical cloudy nights feel like three different diary entries than a
-generated image would have.
+The build's best moment wasn't a feature landing clean, it was a wall
+landing familiar — recognizing this account's Bedrock throttle inside
+minutes because a different app, weeks earlier, had already written down
+exactly what it looks like. That's the whole case for keeping an honest
+build log: not for an audience, for the next project. The second lesson
+is about where creativity actually needs a model in the loop. The picture
+in this app is entirely deterministic code, and it still doesn't feel
+mechanical, because the five words steering it are real. The one line
+Gemini writes under each picture does more to make three nearly identical
+cloudy nights feel like three separate diary entries than a fully
+generated image would have — the model's job here was never to draw, it
+was to notice.
 
 ## Link to App or Repo
 
-- Live app: https://d24q0uqc2v91xq.cloudfront.net
+- Live app: https://dqvgjpr92tnou.cloudfront.net
 - Source: https://github.com/dayzer0-dev/weather-diary

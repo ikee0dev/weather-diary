@@ -5,12 +5,12 @@ choice and the code for it was written, but this account hit the same real
 "too many tokens per day" account-level throttle already logged in
 standup-brief's build history - confirmed on both an image and a text
 model, so it is not a Nova Canvas quirk. Rather than fake the picture or
-wait on a support case that will not resolve inside a weekend, the art is
-generated the same way the descriptor pools already work across every app
-in this series: real numbers mapped deterministically into a visual
-vocabulary, nothing invented. A `random.Random` seeded from the real
-observation timestamp adds shape variety without breaking reproducibility -
-the same real minute always paints the same picture.
+wait on a support case that will not resolve inside a weekend, this file
+just draws conclusions from conditions.read()'s five real words itself:
+each one maps deterministically to a shape count, a color, an angle -
+nothing invented, nothing asked of a model. A `random.Random` seeded from
+the real observation timestamp adds variety without breaking
+reproducibility - the same real minute always paints the same picture.
 
 Canvas is a fixed 800x500 viewBox: sky gradient, sun or moon, clouds, rain,
 wind, and a small silhouette skyline to anchor "a diary of the sky over one
