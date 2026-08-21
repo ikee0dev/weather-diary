@@ -102,4 +102,4 @@ was to notice.
 ## Link to App or Repo
 
 - Live app: https://dqvgjpr92tnou.cloudfront.net
-- Source: https://github.com/dayzer0-dev/weather-diary
+- Source: https://github.com/ikee0dev/weather-diary
